@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 // const csv = require("csv-parser");
-// const fs = require("fs");
+const fs = require("fs");
 const db = require("./db");
 const bcrypt = require("bcrypt");
 
@@ -24,6 +24,73 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // RESTful Routes
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+app.get("/api/files/:type", (req, res) => {
+  const type = req.params.type;
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+
+  const location =
+    type == 1 ? "../uploads/videos/" : "../uploads/audios/hotline_8028";
+
+  const physicalFiles = fs.readdirSync(location);
+
+  const physicalFileSet = new Set(physicalFiles);
+
+  // WHERE contentFile in ("b11u.wav", "11ca.wav", "l61c1a.wav", "b11a.wav")
+
+  const sql =
+    type == 1
+      ? `SELECT id, videoTitle, videoPath FROM digitalContents ORDER BY videoTitle`
+      : `SELECT id, contentFile, contentPlayedLog FROM _8028AudioContent ORDER BY topMainMenu, mainMenuOption, secondMenuOption`;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({
+        error: err.message,
+      });
+    }
+
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit - 1;
+
+    const paginatedItems = rows.slice(startIndex, endIndex);
+
+    const result = paginatedItems.map((row) => ({
+      id: row.id,
+      filename:
+        type == 1
+          ? row.videoPath.replace("uploads/videos/", "")
+          : row.contentFile,
+      contentPlayedLog:
+        type == 1
+          ? row.videoTitle
+          : row.contentPlayedLog.replace("Content Played - ", ""),
+      downloaded: physicalFileSet.has(row.contentFile),
+    }));
+
+    const response = {
+      page,
+      limit,
+      totalCount: rows.length,
+      totalPages: Math.ceil(rows.length / limit),
+      data: result,
+    };
+
+    res.json(response);
+  });
+});
+
+app.get("/api/download/:type/:filename", (req, res) => {
+  const type = req.params.type;
+  const filename = req.params.filename;
+  const location =
+    type == 1 ? "../uploads/videos/" : "../uploads/audios/hotline_8028";
+  const filePath = path.join(__dirname, location, filename);
+
+  res.download(filePath);
+});
 
 // ########### LOGIN ####################
 
