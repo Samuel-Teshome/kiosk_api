@@ -67,7 +67,11 @@ app.get("/api/files/:type", (req, res) => {
         type == 1
           ? row.videoTitle
           : row.contentPlayedLog.replace("Content Played - ", ""),
-      downloaded: physicalFileSet.has(row.contentFile),
+      downloaded: physicalFileSet.has(
+        type == 1
+          ? row.videoPath.replace("uploads/videos/", "")
+          : row.contentFile,
+      ),
     }));
 
     const response = {
