@@ -790,15 +790,15 @@ app.get("/api/contents", (req, res) => {
 // GET filter contents by languageId, categoryId, and subjectAreaId
 // :languageId/:categoryId/:subjectAreaId
 app.get("/api/contents/filter", (req, res) => {
-  const { languageId, categoryId, subjectAreaId } = req.query;
+  const { languageId, categoryId, subjectAreaId, page, limit } = req.query;
 
   let conditions = [];
   let params = [];
 
-  if (languageId) {
-    conditions.push("dc.languageId = ?");
-    params.push(languageId);
-  }
+  // if (languageId) {
+  //   conditions.push("dc.languageId = ?");
+  //   params.push(languageId);
+  // }
   if (categoryId) {
     conditions.push("dc.categoryId = ?");
     params.push(categoryId);
@@ -811,6 +811,23 @@ app.get("/api/contents/filter", (req, res) => {
   const whereClause = conditions.length
     ? `WHERE ${conditions.join(" AND ")}`
     : "";
+
+  // const sql = `
+  //   SELECT
+  //     dc.*,
+  //     c.name AS category,
+  //     l.name AS language,
+  //     sa.name AS subjectArea
+  //   FROM
+  //     digitalContents dc
+  //   LEFT JOIN
+  //     categories c ON dc.categoryId = c.id
+  //   LEFT JOIN
+  //     languages l ON dc.languageId = l.id
+  //   LEFT JOIN
+  //     subjectAreas sa ON dc.subjectAreaId = sa.id
+  //   ${whereClause}
+  // `;
 
   const sql = `
     SELECT 
@@ -827,13 +844,44 @@ app.get("/api/contents/filter", (req, res) => {
     LEFT JOIN 
       subjectAreas sa ON dc.subjectAreaId = sa.id
     ${whereClause}
+    ORDER BY
+      CASE
+        WHEN dc.languageId = ? THEN 1
+              ELSE 2
+      END
   `;
 
-  db.all(sql, params, (err, rows) => {
+  const queryParams = [...params, languageId];
+
+  db.all(sql, queryParams, (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    res.json(rows);
+    // res.json(rows);
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit - 1;
+
+    const hasSelectedLanguage = rows.some(
+      (row) => Number(row.languageId) === Number(languageId),
+    );
+
+    let statusMessage = "";
+
+    if (!hasSelectedLanguage) {
+      statusMessage = "No Contents";
+    }
+
+    const paginatedItems = rows.slice(startIndex, endIndex);
+    const response = {
+      page,
+      limit,
+      totalCount: rows.length,
+      totalPages: Math.ceil(rows.length / limit),
+      data: paginatedItems,
+      statusMessage: statusMessage,
+    };
+
+    res.json(response);
   });
 });
 
@@ -987,6 +1035,48 @@ app.get("/api/gsma", (req, res) => {
     for (let i = 0; i < 10; i++) {
       duplicated.push(...rows);
     }
+
+    const paginatedItems = rows.slice(startIndex, endIndex);
+    const response = {
+      page,
+      limit,
+      totalCount: rows.length,
+      totalPages: Math.ceil(rows.length / limit),
+      data: paginatedItems,
+    };
+
+    res.json(response);
+  });
+});
+
+// GET Filtered GSMA contents
+app.get("/api/gsma/filter", (req, res) => {
+  const languageId = parseInt(req.query.languageId);
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const sql = `
+    SELECT 
+      gc.*, 
+      l.name AS language
+    FROM 
+      gsmaContents gc
+    LEFT JOIN 
+      languages l ON gc.languageId = l.id
+    ORDER BY
+      CASE
+        WHEN gc.languageId = ? THEN 1
+              ELSE 2
+      END
+  `;
+
+  // WHERE gc.languageId = ?
+
+  db.all(sql, [languageId], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit - 1;
 
     const paginatedItems = rows.slice(startIndex, endIndex);
     const response = {
