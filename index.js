@@ -787,6 +787,46 @@ app.get("/api/contents", (req, res) => {
   res.json(response);
 });
 
+app.get("/api/contents/search", (req, res) => {
+  const { searchTerm } = req.query;
+
+  let conditions = [];
+  let params = [];
+
+  if (searchTerm) {
+    conditions.push("dc.videoTitle LIKE ?");
+    params.push(`%${searchTerm}%`);
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+
+  const sql = `
+    SELECT 
+      dc.*, 
+      c.name AS category,
+      l.name AS language,
+      sa.name AS subjectArea
+    FROM 
+      digitalContents dc
+    LEFT JOIN 
+      categories c ON dc.categoryId = c.id
+    LEFT JOIN 
+      languages l ON dc.languageId = l.id
+    LEFT JOIN 
+      subjectAreas sa ON dc.subjectAreaId = sa.id
+    ${whereClause}
+  `;
+
+  db.all(sql, params, (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
+});
+
 // GET filter contents by languageId, categoryId, and subjectAreaId
 // :languageId/:categoryId/:subjectAreaId
 app.get("/api/contents/filter", (req, res) => {
