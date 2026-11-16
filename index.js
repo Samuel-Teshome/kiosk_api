@@ -788,18 +788,20 @@ app.get("/api/contents", (req, res) => {
 });
 
 app.get("/api/contents/search", (req, res) => {
-  const { searchTerm } = req.query;
+  const { keyword, page, limit } = req.query;
 
   let conditions = [];
   let params = [];
 
-  if (searchTerm) {
+  if (keyword) {
     conditions.push("dc.videoTitle LIKE ?");
-    params.push(`%${searchTerm}%`);
+    params.push(`%${keyword}%`);
+    conditions.push("dc.localVideoTitle LIKE ?");
+    params.push(`%${keyword}%`);
   }
 
   const whereClause = conditions.length
-    ? `WHERE ${conditions.join(" AND ")}`
+    ? `WHERE ${conditions.join(" OR ")}`
     : "";
 
   const sql = `
@@ -819,11 +821,27 @@ app.get("/api/contents/search", (req, res) => {
     ${whereClause}
   `;
 
+  let statusMessage = "";
+
   db.all(sql, params, (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    res.json(rows);
+
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit - 1;
+
+    const paginatedItems = rows.slice(startIndex, endIndex);
+    const response = {
+      page,
+      limit,
+      totalCount: rows.length,
+      totalPages: Math.ceil(rows.length / limit),
+      data: paginatedItems,
+      statusMessage: statusMessage,
+    };
+
+    res.json(response);
   });
 });
 
@@ -948,7 +966,7 @@ app.post("/api/contents", express.json(), (req, res) => {
   }
 
   const insertStmt = db.prepare(
-    "INSERT INTO digitalContents (categoryId, languageId, subjectAreaId, videoTitle, videoPath, thumbNailPath, youtubeId) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO digitalContents (categoryId, languageId, subjectAreaId, originalVideoTitle, location, videoTitle, localLocation, localVideoTitle, videoPath, thumbNailPath, youtubeId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   );
 
   let insertedCount = 0;
@@ -963,7 +981,11 @@ app.post("/api/contents", express.json(), (req, res) => {
           row.categoryId,
           row.languageId,
           row.subjectAreaId,
+          row.originalVideoTitle,
+          row.location,
           row.videoTitle,
+          row.localLocation,
+          row.localVideoTitle,
           row.videoPath,
           row.thumbNailPath,
           row.youtubeId,
