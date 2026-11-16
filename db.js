@@ -36,7 +36,11 @@ db.serialize(() => {
         categoryId INTEGER NOT NULL,
         languageId INTEGER NOT NULL,
         subjectAreaId INTEGER NOT NULL,
-        videoTitle TEXT NOT NULL UNIQUE,
+        originalVideoTitle TEXT NOT NULL UNIQUE,
+        location TEXT,
+        videoTitle TEXT NOT NULL,
+        localLocation TEXT,
+        localVideoTitle TEXT NOT NULL,
         videoPath TEXT NOT NULL,
         thumbNailPath TEXT NOT NULL,
         youtubeId TEXT NOT NULL,
@@ -65,6 +69,7 @@ db.serialize(() => {
   //   db.run(`DROP TABLE _8028MainMenu`);
   //   db.run(`DROP TABLE _8028TopMenu`);
   //   db.run(`DROP TABLE _8028Languages`);
+  //   db.run(`DROP TABLE digitalContents`);
 
   db.run(`CREATE TABLE IF NOT EXISTS _8028Languages (
         code INTEGER PRIMARY KEY NOT NULL UNIQUE,
